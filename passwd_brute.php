@@ -59,9 +59,14 @@ try{
     echo "__toString(): " . $e->__toString();
 }
 
-
-print_r(post_request($local_args["--url"], ["email"=>$local_args["--email"],"password"=>"admin123"]));
-
+/**
+ * post_request
+ *
+ * @param  mixed $url
+ * @param  mixed $params
+ * @param  mixed $json_encode
+ * @return void
+ */
 function post_request($url, array $params, $json_encode = false) {
     
     $parsed_url = parse_url($url);
@@ -72,13 +77,12 @@ function post_request($url, array $params, $json_encode = false) {
     } else {
         //use this for 'Content-Type: application/json'
         $content = json_encode($params);
-    }     
+    }
 
     $req = [
         'http' => [
             'header'  => [ // header array does not need '\r\n'
-                // 'Content-type: application/x-www-form-urlencoded',
-                'Content-Type: application/json',
+                $json_encode ? 'Content-Type: application/json' : 'Content-type: application/x-www-form-urlencoded',
                 'Host: ' . $parsed_url['host'],
                 'Accept-Language: en-US,en;q=0.5',
                 'Accept-Encoding: gzip, deflate',
@@ -95,8 +99,12 @@ function post_request($url, array $params, $json_encode = false) {
         ]
     ];
 
-    @$fp = fopen($url, 'r', FALSE, // do not use_include_path
-        stream_context_create($req));
+    @$fp = fopen(
+        $url, 
+        'r', 
+        FALSE, // do not use_include_path
+        stream_context_create($req)
+    );
 
     if ($fp) {        
         $result = "\n\n ******* THE PASSWORD IS: " . $params['password'] . " ******* \n" . stream_get_contents($fp); // no maxlength/offset
